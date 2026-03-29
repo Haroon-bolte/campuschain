@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CampusChain — Blockchain University Financial Ecosystem</title>
+<meta name="description" content="CampusChain: Blockchain-Powered University Financial Ecosystem for MIT-ADT University">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['DM Sans','sans-serif'],mono:['JetBrains Mono','monospace']}}}}</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:#0a0a0f;color:#e2e8f0;overflow:hidden}
+.glass{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.glow-p{box-shadow:0 0 20px rgba(124,58,237,0.3),inset 0 0 20px rgba(124,58,237,0.05)}
+.glow-t{box-shadow:0 0 20px rgba(13,148,136,0.3),inset 0 0 20px rgba(13,148,136,0.05)}
+.glow-r{box-shadow:0 0 20px rgba(225,29,72,0.3),inset 0 0 20px rgba(225,29,72,0.05)}
+.gradient-text{background:linear-gradient(135deg,#7c3aed,#2563eb);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.btn-p{background:linear-gradient(135deg,#7c3aed,#2563eb);transition:all .2s;cursor:pointer}
+.btn-p:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 8px 25px rgba(124,58,237,0.4)}
+.btn-s{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);transition:all .2s;cursor:pointer}
+.btn-s:hover{background:rgba(255,255,255,0.12);transform:translateY(-1px)}
+.nav-item{transition:all .2s;cursor:pointer;border:1px solid transparent}
+.nav-item:hover{background:rgba(124,58,237,0.15);border-color:rgba(124,58,237,0.3)!important}
+.nav-item.active{background:rgba(124,58,237,0.2);border-color:rgba(124,58,237,0.5)!important}
+.tr:hover td{background:rgba(124,58,237,0.08)}
+.scroll{overflow-y:auto;overflow-x:hidden}
+.scroll::-webkit-scrollbar{width:4px}
+.scroll::-webkit-scrollbar-thumb{background:rgba(124,58,237,0.3);border-radius:2px}
+input,select,textarea{background:rgba(255,255,255,0.07)!important;border:1px solid rgba(255,255,255,0.15)!important;color:#e2e8f0!important;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:rgba(124,58,237,0.6)!important;box-shadow:0 0 0 3px rgba(124,58,237,0.1)}
+input::placeholder,textarea::placeholder{color:rgba(226,232,240,0.3)}
+select option{background:#1a1a2e;color:#e2e8f0}
+@keyframes float{0%,100%{transform:translateY(0) scale(1);opacity:.4}50%{transform:translateY(-20px) scale(1.1);opacity:.8}}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes fadeIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.toast-anim{animation:slideIn .3s ease}
+.modal-anim{animation:fadeIn .2s ease}
+.particle{position:absolute;border-radius:50%}
+.grid-bg{background-image:linear-gradient(rgba(124,58,237,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,.07) 1px,transparent 1px);background-size:60px 60px}
+.toggle-sw{position:relative;display:inline-block;width:44px;height:24px}
+.toggle-sw input{opacity:0;width:0;height:0}
+.toggle-sl{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,.15);transition:.3s;border-radius:24px}
+.toggle-sl:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;transition:.3s;border-radius:50%}
+input:checked+.toggle-sl{background:#7c3aed}
+input:checked+.toggle-sl:before{transform:translateX(20px)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="data.js" data-presets="react"></script>
+<script type="text/babel" src="utils.js" data-presets="react"></script>
+<script type="text/babel" src="login.js" data-presets="react"></script>
+<script type="text/babel" src="layout.js" data-presets="react"></script>
+<script type="text/babel" src="admin-pages.js" data-presets="react"></script>
+<script type="text/babel" src="student-pages.js" data-presets="react"></script>
+<script type="text/babel" src="app.js" data-presets="react"></script>
+</body>
+</html>

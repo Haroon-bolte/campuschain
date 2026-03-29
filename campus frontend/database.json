@@ -1,0 +1,57 @@
+{
+  "users": [
+    {"id": 1, "name": "Dr. Meera Joshi", "email": "meera@mitadt.edu", "role": "Admin", "wallet": "0x7f3a4b9e2c1d8f3a4b9e2c1d8f3a4b9e2c1d8f3a", "balance": 50000, "status": "Active", "dept": "Administration"},
+    {"id": 2, "name": "Rahul Sharma", "email": "rahul@mitadt.edu", "role": "Student", "wallet": "0x4b2e1f8a9c3d7e4b2e1f8a9c3d7e4b2e1f8a9c3d", "balance": 4250, "status": "Active", "dept": "Computer Science", "rollNo": "CS2021045", "sem": 6},
+    {"id": 3, "name": "Priya Patel", "email": "priya@mitadt.edu", "role": "Student", "wallet": "0x9c1d7e3b2a8f6c9c1d7e3b2a8f6c9c1d7e3b2a8f", "balance": 2800, "status": "Active", "dept": "Electronics", "rollNo": "EC2021032", "sem": 4},
+    {"id": 4, "name": "Arjun Kumar", "email": "arjun@mitadt.edu", "role": "Student", "wallet": "0x2a8f4c9d6e1b3f2a8f4c9d6e1b3f2a8f4c9d6e1b", "balance": 5100, "status": "Active", "dept": "Mechanical", "rollNo": "ME2021018", "sem": 6},
+    {"id": 5, "name": "Sneha Singh", "email": "sneha@mitadt.edu", "role": "Student", "wallet": "0x6e4b8a2f3d7c5b6e4b8a2f3d7c5b6e4b8a2f3d7c", "balance": 1200, "status": "Suspended", "dept": "Civil", "rollNo": "CV2022011", "sem": 2},
+    {"id": 6, "name": "Prof. Anita Desai", "email": "anita@mitadt.edu", "role": "Faculty", "wallet": "0x3d7c5b1e9a4f2e3d7c5b1e9a4f2e3d7c5b1e9a4f", "balance": 15000, "status": "Active", "dept": "Computer Science"}
+  ],
+  "fees": [
+    {"id": 1, "sid": 2, "sname": "Rahul Sharma", "cat": "Tuition", "amount": 45000, "due": "2026-04-15", "status": "Pending"},
+    {"id": 2, "sid": 3, "sname": "Priya Patel", "cat": "Hostel", "amount": 12000, "due": "2026-04-10", "status": "Pending"},
+    {"id": 3, "sid": 4, "sname": "Arjun Kumar", "cat": "Library", "amount": 2500, "due": "2026-04-05", "status": "Pending"},
+    {"id": 4, "sid": 2, "sname": "Rahul Sharma", "cat": "Events", "amount": 1500, "due": "2026-04-20", "status": "Pending"},
+    {"id": 5, "sid": 5, "sname": "Sneha Singh", "cat": "Tuition", "amount": 45000, "due": "2026-03-25", "status": "Confirmed", "txHash": "0xab12c3d4", "paidAt": "2026-03-20"},
+    {"id": 6, "sid": 3, "sname": "Priya Patel", "cat": "Tuition", "amount": 45000, "due": "2026-03-30", "status": "Confirmed", "txHash": "0xcd45e6f7", "paidAt": "2026-03-18"}
+  ],
+  "events": [
+    {"id": 1, "name": "Tech Fest 2026", "date": "2026-04-25", "venue": "Main Auditorium", "price": 500, "cap": 500, "sold": 342, "status": "Active", "desc": "Annual tech festival with hackathons & keynotes."},
+    {"id": 2, "name": "Cultural Night", "date": "2026-05-02", "venue": "Open Air Theatre", "price": 300, "cap": 800, "sold": 621, "status": "Active", "desc": "Celebration of diverse cultures with music and art."},
+    {"id": 3, "name": "Sports Day 2026", "date": "2026-04-18", "venue": "Sports Complex", "price": 0, "cap": 2000, "sold": 1847, "status": "Active", "desc": "Inter-department sports competition."},
+    {"id": 4, "name": "Alumni Meet", "date": "2026-06-15", "venue": "Convention Hall", "price": 1200, "cap": 300, "sold": 89, "status": "Active", "desc": "Annual gathering of MIT-ADT alumni."}
+  ],
+  "txns": [
+    {"id": 1, "hash": "0x7f3a9d2c4b8e", "type": "FEE_PAYMENT", "sname": "Rahul Sharma", "amount": 45000, "service": "Tuition", "status": "CONFIRMED", "ts": "2026-03-28 14:32", "block": 2847389},
+    {"id": 2, "hash": "0x4b2e1f8a9c3d", "type": "TOKEN_MINT", "sname": "Priya Patel", "amount": 5000, "service": "Top-Up", "status": "CONFIRMED", "ts": "2026-03-28 13:15", "block": 2847385},
+    {"id": 3, "hash": "0x9c1d7e3b2a8f", "type": "P2P_XFER", "sname": "Arjun Kumar", "amount": 800, "service": "P2P", "status": "CONFIRMED", "ts": "2026-03-28 12:48", "block": 2847381},
+    {"id": 4, "hash": "0x2a8f4c9d6e1b", "type": "FEE_PAYMENT", "sname": "Sneha Singh", "amount": 12000, "service": "Hostel", "status": "FAILED", "ts": "2026-03-28 11:22", "block": 2847378},
+    {"id": 5, "hash": "0x6e4b8a2f3d7c", "type": "SMART_CTR", "sname": "Admin", "amount": 0, "service": "Policy", "status": "CONFIRMED", "ts": "2026-03-27 09:14", "block": 2847350},
+    {"id": 6, "hash": "0x3d7c5b1e9a4f", "type": "TOKEN_MINT", "sname": "Rahul Sharma", "amount": 2000, "service": "Event Ticket", "status": "PENDING", "ts": "2026-03-27 08:55", "block": 2847347}
+  ],
+  "disputes": [
+    {"id": 1, "sname": "Rahul Sharma", "reason": "Double charged for hostel fee", "amount": 12000, "pri": "HIGH", "raised": "2026-03-27", "status": "Open"},
+    {"id": 2, "sname": "Arjun Kumar", "reason": "Event ticket not received after payment", "amount": 500, "pri": "MED", "raised": "2026-03-26", "status": "Open"},
+    {"id": 3, "sname": "Priya Patel", "reason": "P2P transfer not credited to wallet", "amount": 1500, "pri": "HIGH", "raised": "2026-03-25", "status": "Open"},
+    {"id": 4, "sname": "Sneha Singh", "reason": "Wallet frozen incorrectly", "amount": 0, "pri": "LOW", "raised": "2026-03-20", "status": "Resolved", "resolvedAt": "2026-03-22"}
+  ],
+  "policies": [
+    {"id": 1, "name": "Max Daily Spend", "val": 5000, "unit": "₹", "enabled": true, "desc": "Max daily spend limit per student"},
+    {"id": 2, "name": "P2P Transfer Limit", "val": 2000, "unit": "₹", "enabled": true, "desc": "Max single P2P transfer amount"},
+    {"id": 3, "name": "Auto-Fine on Late Fee", "val": 2, "unit": "%", "enabled": true, "desc": "Daily fine % for overdue fees"},
+    {"id": 4, "name": "Event Ticket Resale Lock", "val": 7, "unit": "days", "enabled": false, "desc": "Lock period before resale allowed"},
+    {"id": 5, "name": "KYC Required", "val": 1, "unit": "bool", "enabled": true, "desc": "KYC verification for new wallets"},
+    {"id": 6, "name": "Wallet Freeze on Suspension", "val": 1, "unit": "bool", "enabled": true, "desc": "Auto-freeze wallet on suspension"},
+    {"id": 7, "name": "Token Expiry", "val": 365, "unit": "days", "enabled": false, "desc": "Days until CampusCoin tokens expire"},
+    {"id": 8, "name": "Spending Category Lock", "val": 1, "unit": "bool", "enabled": false, "desc": "Lock spending to specific categories"}
+  ],
+  "audit": [
+    {"id": 1, "ts": "2026-03-28 14:32", "block": 2847389, "action": "FEE_CONFIRMED", "actor": "Dr. Meera Joshi", "detail": "Marked Rahul Sharma Tuition fee as paid", "hash": "0x7f3a9d2c"},
+    {"id": 2, "ts": "2026-03-28 11:30", "block": 2847379, "action": "POLICY_UPDATE", "actor": "Dr. Meera Joshi", "detail": "Updated Max Daily Spend to ₹5000", "hash": "0x4b2e1f8a"},
+    {"id": 3, "ts": "2026-03-27 16:45", "block": 2847360, "action": "USER_SUSPENDED", "actor": "Dr. Meera Joshi", "detail": "Suspended account: Sneha Singh", "hash": "0x9c1d7e3b"},
+    {"id": 4, "ts": "2026-03-27 09:14", "block": 2847350, "action": "SMART_CTR", "actor": "System", "detail": "Policy contract deployed on-chain", "hash": "0x6e4b8a2f"}
+  ],
+  "nfts": [
+    {"id": "NFT-001", "sid": 2, "sname": "Rahul Sharma", "eid": 1, "ename": "Tech Fest 2026", "seat": "A-24", "ts": "2026-03-25 10:15", "token": "TKT-7f3a9d"}
+  ]
+}

@@ -1,0 +1,165 @@
+var App=()=>{
+  var [user,setUser]=useState(null);
+  var [page,setPage]=useState('overview');
+  var [collapsed,setCollapsed]=useState(false);
+  var [isLoaded,setIsLoaded]=useState(false);
+  var [dbError,setDbError]=useState(null);
+
+  // Initialize with empty arrays instead of hardcoded data
+  var [users,setUsers]=useState([]);
+  var [fees,setFees]=useState([]);
+  var [events,setEvents]=useState([]);
+  var [txns,setTxns]=useState([]);
+  var [disputes,setDisputes]=useState([]);
+  var [policies,setPolicies]=useState([]);
+  var [auditLog,setAuditLog]=useState([]);
+  var [nfts,setNfts]=useState([]);
+  var [toasts,setToasts]=useState([]);
+  var [block,setBlock]=useState(2847392);
+  var [liveEvents,setLiveEvents]=useState([]);
+
+  // Fetch the frontend database JSON directly
+  useEffect(()=>{
+    fetch('database.json')
+      .then(res => {
+        if(!res.ok) throw new Error("HTTP error " + res.status);
+        return res.json();
+      })
+      .then(data => {
+        setUsers(data.users || []);
+        setFees(data.fees || []);
+        setEvents(data.events || []);
+        setTxns(data.txns || []);
+        setDisputes(data.disputes || []);
+        setPolicies(data.policies || []);
+        setAuditLog(data.audit || []); // mapped to database.json key "audit"
+        setNfts(data.nfts || []);
+        setIsLoaded(true);
+      })
+      .catch(err => {
+        console.error("Database fetch failed:", err);
+        setDbError(err.message);
+      });
+  },[]);
+
+  // Blockchain and event simulation intervals
+  useEffect(()=>{
+    if(!isLoaded) return;
+    var t=setInterval(()=>setBlock(b=>b+1),4000);
+    return()=>clearInterval(t);
+  },[isLoaded]);
+
+  useEffect(()=>{
+    if(!isLoaded) return;
+    var t=setInterval(()=>{
+      var type=rnd(EVT_TYPES);
+      var desc=rnd(EVT_DESCS[type]);
+      setLiveEvents(prev=>[...prev.slice(-20),{type,desc,block:block+Math.floor(Math.random()*5),ts:fmtNow()}]);
+    },3000);
+    return()=>clearInterval(t);
+  },[block, isLoaded]);
+
+  var toast=useCallback((type,title,msg)=>{
+    var id=Date.now();
+    setToasts(prev=>[...prev,{id,type,title,msg}]);
+    setTimeout(()=>setToasts(prev=>prev.filter(t=>t.id!==id)),3500);
+  },[]);
+
+  var addAudit=useCallback((action,actor,detail)=>{
+    var entry={id:Date.now(),ts:fmtNow(),block,action,actor,detail,hash:genHash()};
+    setAuditLog(prev=>[...prev,entry]);
+  },[block]);
+
+  var addTxn=useCallback((t)=>{
+    var entry={id:Date.now(),hash:genHash(),type:t.type,sname:t.sname,amount:t.amount,service:t.service,status:t.status,ts:fmtNow(),block};
+    setTxns(prev=>[...prev,entry]);
+  },[block]);
+
+  var login=useCallback(u=>{
+    setUser(u);
+    setPage(u.role==='admin'?'overview':'my-wallet');
+    toast('success',`Welcome, ${u.name}!`,u.role==='admin'?'Admin Dashboard':'Student Dashboard');
+  },[]);
+
+  var logout=useCallback(()=>{setUser(null);setPage('overview');},[]);
+
+  // IF FETCH FAILED DUE TO CORS (Local File Execution)
+  if(dbError) {
+    return(
+      <div className="flex h-screen w-screen items-center justify-center p-6 text-center" style={{background:'#0a0a0f',color:'white'}}>
+        <div className="glass rounded-2xl p-8 max-w-lg glow-r">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold mb-2">CORS / Protocol Error</h2>
+          <p className="text-sm text-gray-400 mb-6">Because we are now fetching data securely from `database.json`, you cannot double-click the HTML file to open it. Browsers block local file fetching.</p>
+          <div className="text-left text-xs bg-black/50 p-4 rounded-xl font-mono text-gray-300">
+            Please use a local web server.<br/><br/>
+            If you are using VS Code:<br/>
+            1. Install the "Live Server" extension.<br/>
+            2. Right click index.html and select "Open with Live Server".
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // IF STILL LOADING THE FETCH
+  if(!isLoaded){
+    return(
+      <div className="flex flex-col h-screen w-screen items-center justify-center" style={{background:'#0a0a0f',color:'white'}}>
+        <div style={{animation:'spin 1s linear infinite'}} className="text-4xl mb-4">⛓</div>
+        <div className="text-sm text-gray-400">Loading Database...</div>
+      </div>
+    );
+  }
+
+  if(!user){
+    return(
+      <div style={{position:'fixed',inset:0,overflow:'hidden'}}>
+        <LoginScreen onLogin={login}/>
+        <Toast toasts={toasts}/>
+      </div>
+    );
+  }
+
+  var sharedProps={user,users,setUsers,fees,setFees,events,setEvents,txns,addTxn,disputes,setDisputes,policies,setPolicies,auditLog,setAuditLog,nfts,setNfts,addAudit,toast};
+
+  var adminPage=()=>{
+    switch(page){
+      case 'overview': return <OverviewPage txns={txns} liveEvents={liveEvents} addAudit={addAudit}/>;
+      case 'fee-portal': return <FeePortalPage fees={fees} setFees={setFees} users={users} addAudit={addAudit} addTxn={addTxn} toast={toast}/>;
+      case 'event-tickets': return <EventTicketsPage events={events} setEvents={setEvents} users={users} nfts={nfts} setNfts={setNfts} addAudit={addAudit} addTxn={addTxn} toast={toast}/>;
+      case 'p2p-transactions': return <P2PAdminPage txns={txns}/>;
+      case 'disputes': return <DisputesPage disputes={disputes} setDisputes={setDisputes} addAudit={addAudit} toast={toast}/>;
+      case 'users-roles': return <UsersRolesPage users={users} setUsers={setUsers} addAudit={addAudit} toast={toast}/>;
+      case 'policy-config': return <PolicyConfigPage policies={policies} setPolicies={setPolicies} addAudit={addAudit} toast={toast}/>;
+      case 'audit-trail': return <AuditTrailPage auditLog={auditLog}/>;
+      default: return <OverviewPage txns={txns} liveEvents={liveEvents} addAudit={addAudit}/>;
+    }
+  };
+
+  var studentPage=()=>{
+    switch(page){
+      case 'my-wallet': return <MyWalletPage user={user} users={users} setUsers={setUsers} txns={txns} toast={toast}/>;
+      case 'my-fees': return <MyFeesPage user={user} users={users} setUsers={setUsers} fees={fees} setFees={setFees} addTxn={addTxn} addAudit={addAudit} toast={toast}/>;
+      case 'events-tickets': return <EventsTicketsPage user={user} users={users} setUsers={setUsers} events={events} setEvents={setEvents} nfts={nfts} setNfts={setNfts} addTxn={addTxn} addAudit={addAudit} toast={toast}/>;
+      case 'p2p-transfer': return <P2PTransferPage user={user} users={users} setUsers={setUsers} addTxn={addTxn} addAudit={addAudit} policies={policies} toast={toast}/>;
+      case 'my-profile': return <MyProfilePage user={user} users={users} txns={txns} fees={fees} nfts={nfts}/>;
+      default: return <MyWalletPage user={user} users={users} setUsers={setUsers} txns={txns} toast={toast}/>;
+    }
+  };
+
+  return(
+    <div style={{position:'fixed',inset:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+      <TopBar user={user} page={page} block={block} onLogout={logout} notifs={disputes.filter(d=>d.status==='Open').length}/>
+      <div style={{display:'flex',flex:1,overflow:'hidden'}}>
+        <Sidebar role={user.role} page={page} setPage={setPage} disputes={disputes} fees={fees} collapsed={collapsed} setCollapsed={setCollapsed}/>
+        <div className="flex-1 scroll" style={{background:'#0a0a0f'}}>
+          {user.role==='admin'?adminPage():studentPage()}
+        </div>
+      </div>
+      <Toast toasts={toasts}/>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
