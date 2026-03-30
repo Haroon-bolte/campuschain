@@ -18,34 +18,49 @@ var App=()=>{
   var [block,setBlock]=useState(2847392);
   var [liveEvents,setLiveEvents]=useState([]);
 
-  // Fetch the frontend database JSON directly
+  // Fetch data from real API
   useEffect(()=>{
-    fetch('database.json')
-      .then(res => {
-        if(!res.ok) throw new Error("HTTP error " + res.status);
-        return res.json();
-      })
-      .then(data => {
-        setUsers(data.users || []);
-        setFees(data.fees || []);
-        setEvents(data.events || []);
-        setTxns(data.txns || []);
-        setDisputes(data.disputes || []);
-        setPolicies(data.policies || []);
-        setAuditLog(data.audit || []); // mapped to database.json key "audit"
-        setNfts(data.nfts || []);
-        setIsLoaded(true);
-      })
-      .catch(err => {
-        console.error("Database fetch failed:", err);
-        setDbError(err.message);
-      });
+    const fetchData = async () => {
+        try {
+            await CampusAPI.init(); // Load contract addresses first
+            const [u, f, e, t, d, p] = await Promise.all([
+                CampusAPI.getUsers(),
+                CampusAPI.getFees(),
+                CampusAPI.getEvents(),
+                CampusAPI.getTransactions(),
+                // Disputes and Audit are part of the endpoints
+                fetch('http://localhost:5000/api/disputes').then(r => r.json()),
+                CampusAPI.getTransactions() // Audit log is essentially transactional or separate
+            ]);
+
+            setUsers(u || []);
+            setFees(f || []);
+            setEvents(e || []);
+            setTxns(t || []);
+            setDisputes(d || []);
+            // Policies fetch
+            fetch('http://localhost:5000/api/policies').then(r => r.json()).then(setPolicies);
+            
+            setIsLoaded(true);
+        } catch (err) {
+            console.error("API fetch failed:", err);
+            setDbError(err.message);
+        }
+    };
+    fetchData();
   },[]);
 
-  // Blockchain and event simulation intervals
+  // Real Blockchain block number
   useEffect(()=>{
     if(!isLoaded) return;
-    var t=setInterval(()=>setBlock(b=>b+1),4000);
+    const updateBlock = async () => {
+        try {
+            const b = await CampusAPI.getBlockNumber();
+            if (b) setBlock(b);
+        } catch (e) {}
+    };
+    updateBlock();
+    var t=setInterval(updateBlock, 5000);
     return()=>clearInterval(t);
   },[isLoaded]);
 
@@ -54,8 +69,8 @@ var App=()=>{
     var t=setInterval(()=>{
       var type=rnd(EVT_TYPES);
       var desc=rnd(EVT_DESCS[type]);
-      setLiveEvents(prev=>[...prev.slice(-20),{type,desc,block:block+Math.floor(Math.random()*5),ts:fmtNow()}]);
-    },3000);
+      setLiveEvents(prev=>[...prev.slice(-20),{type,desc,block:block+Math.floor(Math.random()*2),ts:fmtNow()}]);
+    },6000);
     return()=>clearInterval(t);
   },[block, isLoaded]);
 

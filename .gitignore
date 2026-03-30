@@ -1,0 +1,41 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Build outputs
+dist/
+build/
+backend/artifacts/
+backend/cache/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor folders
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Hardhat
+backend/typechain/
+backend/typechain-types/
+backend/cache/
+backend/artifacts/
+
+# Deployment info (optional to ignore, usually kept for local dev)
+# backend/deployments/
+# campusfrontend/contracts.json

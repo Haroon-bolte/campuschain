@@ -66,12 +66,18 @@ var FeePortalPage=({fees,setFees,users,addAudit,addTxn,toast})=>{
   var [reminderText,setReminderText]=useState('');
   var pending=fees.filter(f=>f.status==='Pending');
   var confirmed=fees.filter(f=>f.status==='Confirmed');
-  var markPaid=f=>{
-    var hash=genHash();
-    setFees(prev=>prev.map(x=>x.id===f.id?{...x,status:'Confirmed',txHash:hash,paidAt:fmtNow()}:x));
-    addAudit('FEE_CONFIRMED','Dr. Meera Joshi',`Marked ${f.sname} ${f.cat} fee as paid`);
-    addTxn({type:'FEE_PAYMENT',sname:f.sname,amount:f.amount,service:f.cat,status:'CONFIRMED'});
-    toast('success','Fee Confirmed',`${f.sname} — ${f.cat} marked as paid`);
+  var markPaid = async f => {
+    try {
+      const res = await CampusAPI.updateFee(f.id, { status: 'Confirmed', paidAt: new Date().toISOString() });
+      if (res.error) throw new Error(res.error);
+      
+      setFees(prev => prev.map(x => x.id === f.id ? { ...x, status: 'Confirmed', paidAt: fmtNow() } : x));
+      addAudit('FEE_CONFIRMED', user.name, `Marked ${f.sname} ${f.cat} fee as paid`);
+      addTxn({ type: 'FEE_PAYMENT', sname: f.sname, amount: f.amount, service: f.cat, status: 'CONFIRMED' });
+      toast('success', 'Fee Confirmed', `${f.sname} — ${f.cat} marked as paid`);
+    } catch (err) {
+      toast('error', 'Update Failed', err.message);
+    }
   };
   var sendReminder=f=>{setReminderText(rnd(AI_REMIND)+` [Student: ${f.sname}, Amount: ${fmtINR(f.amount)}, Due: ${f.due}]`);setModal('reminder');};
   var catProgress={Tuition:[...fees].filter(f=>f.cat==='Tuition'),Hostel:[...fees].filter(f=>f.cat==='Hostel'),Library:[...fees].filter(f=>f.cat==='Library'),Events:[...fees].filter(f=>f.cat==='Events')};
@@ -122,14 +128,24 @@ var EventTicketsPage=({events,setEvents,users,nfts,setNfts,addAudit,addTxn,toast
   var [form,setForm]=useState({name:'',date:'',venue:'',price:'',cap:''});
   var [mintForm,setMintForm]=useState({sid:'',seat:''});
   var students=users.filter(u=>u.role==='Student');
-  var createEvent=()=>{
+  var createEvent = async () => {
     if(!form.name||!form.date)return;
-    var desc=rnd(AI_EVENT_DESC);
-    var ne={id:nextId(events),name:form.name,date:form.date,venue:form.venue,price:Number(form.price)||0,cap:Number(form.cap)||100,sold:0,status:'Active',desc};
-    setEvents(prev=>[...prev,ne]);
-    addAudit('EVENT_CREATED','Dr. Meera Joshi',`Created event: ${form.name}`);
-    toast('success','Event Created!',form.name);
-    setForm({name:'',date:'',venue:'',price:'',cap:''});setModal(null);
+    try {
+      const res = await CampusAPI.createEvent({
+        ...form,
+        priceByToken: Number(form.price),
+        capacity: Number(form.cap)
+      });
+      if (res.error) throw new Error(res.error);
+      
+      setEvents(prev => [...prev, res]);
+      addAudit('EVENT_CREATED', user.name, `Created event: ${form.name}`);
+      toast('success', 'Event Created!', form.name);
+      setForm({ name: '', date: '', venue: '', price: '', cap: '' }); 
+      setModal(null);
+    } catch (err) {
+      toast('error', 'Creation Failed', err.message);
+    }
   };
   var deleteEvent=e=>{if(!window.confirm(`Delete "${e.name}"?`))return;setEvents(prev=>prev.filter(x=>x.id!==e.id));addAudit('EVENT_DELETED','Dr. Meera Joshi',`Deleted event: ${e.name}`);toast('info','Event Deleted',e.name);};
   var mintNFT=()=>{

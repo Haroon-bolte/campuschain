@@ -1,21 +1,49 @@
 var LoginScreen=({onLogin})=>{
+  var [mode,setMode]=useState('login'); // 'login' or 'register'
   var [role,setRole]=useState('student');
+  var [name,setName]=useState('');
   var [email,setEmail]=useState('');
   var [pw,setPw]=useState('');
   var [err,setErr]=useState('');
   var [loading,setLoading]=useState(false);
+  
   var CREDS={admin:{email:'meera@mitadt.edu',pw:'admin123'},student:{email:'rahul@mitadt.edu',pw:'student123'}};
   var particles=useMemo(()=>Array.from({length:20},(_,i)=>({id:i,size:Math.random()*6+2,x:Math.random()*100,y:Math.random()*100,dur:Math.random()*8+4,delay:Math.random()*4,color:['#7c3aed','#2563eb','#0d9488'][i%3]})),[]);
-  var autofill=()=>{setEmail(CREDS[role].email);setPw(CREDS[role].pw);};
-  var submit=e=>{
-    e.preventDefault();setErr('');setLoading(true);
-    setTimeout(()=>{
-      if(role==='admin'&&email===CREDS.admin.email&&pw===CREDS.admin.pw)onLogin({id:1,name:'Dr. Meera Joshi',role:'admin'});
-      else if(role==='student'&&email===CREDS.student.email&&pw===CREDS.student.pw)onLogin({id:2,name:'Rahul Sharma',role:'student'});
-      else setErr('Invalid credentials. Click autofill for demo access.');
-      setLoading(false);
-    },700);
+  
+  var autofill=()=>{
+    setEmail(CREDS[role].email);
+    setPw(CREDS[role].pw);
+    if(mode==='register') setName(role==='admin'?'Dr. Meera Joshi':'Rahul Sharma');
   };
+
+  var submit=async e=>{
+    e.preventDefault();
+    setErr('');
+    setLoading(true);
+
+    try {
+      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const body = mode === 'login' ? { email, password: pw } : { name, email, password: pw, role: role.charAt(0).toUpperCase() + role.slice(1) };
+      
+      const res = await fetch(`http://localhost:5000${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Authentication failed');
+
+      localStorage.setItem('cc_token', data.token);
+      onLogin(data.user);
+    } catch (err) {
+      console.error(err);
+      setErr(err.message + ". Try autofill for demo.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return(
     <div className="w-full h-full flex items-center justify-center relative" style={{background:'#0a0a0f'}}>
       <div className="grid-bg absolute inset-0 pointer-events-none"/>
@@ -23,27 +51,44 @@ var LoginScreen=({onLogin})=>{
         <div key={p.id} className="particle pointer-events-none" style={{width:p.size,height:p.size,left:`${p.x}%`,top:`${p.y}%`,background:p.color,opacity:.35,boxShadow:`0 0 ${p.size*2}px ${p.color}`,animation:`float ${p.dur}s ${p.delay}s ease-in-out infinite`}}/>
       ))}
       <div className="glass rounded-3xl p-8 w-full max-w-md relative z-10" style={{border:'1px solid rgba(124,58,237,.35)',boxShadow:'0 0 60px rgba(124,58,237,.2)'}}>
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="text-5xl mb-3">⛓</div>
           <h1 className="text-3xl font-bold gradient-text">CampusChain</h1>
-          <p className="text-gray-500 text-sm mt-1">Blockchain-Powered University Financial Ecosystem</p>
-          <p className="text-gray-600 text-xs mt-0.5">MIT-ADT University · Pune</p>
+          <p className="text-gray-500 text-sm mt-1">{mode==='login'?'Sign in to your account':'Create a new account'}</p>
         </div>
-        <div className="flex rounded-xl overflow-hidden mb-6 p-1" style={{background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)'}}>
-          {[['student','🎓 Student Login'],['admin','🛡 Admin Login']].map(([r,lbl])=>(
-            <button key={r} onClick={()=>{setRole(r);setEmail('');setPw('');setErr('');}} className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${role===r?'text-white':'text-gray-500 hover:text-gray-300'}`} style={role===r?{background:'linear-gradient(135deg,#7c3aed,#2563eb)',boxShadow:'0 4px 15px rgba(124,58,237,.3)'}:{}}>{lbl}</button>
+
+        <div className="flex gap-4 mb-6 border-b border-white/10">
+          {['login','register'].map(m=>(
+            <button key={m} onClick={()=>setMode(m)} className={`pb-2 text-sm font-medium transition-all ${mode===m?'text-purple-400 border-b-2 border-purple-400':'text-gray-500 hover:text-gray-300'}`}>
+              {m==='login'?'Login':'Register'}
+            </button>
           ))}
         </div>
+
+        <div className="flex rounded-xl overflow-hidden mb-6 p-1" style={{background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)'}}>
+          {[['student','🎓 Student'],['admin','🛡 Admin']].map(([r,lbl])=>(
+            <button key={r} onClick={()=>{setRole(r);setEmail('');setPw('');setErr('');}} className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all ${role===r?'text-white':'text-gray-500 hover:text-gray-300'}`} style={role===r?{background:'linear-gradient(135deg,#7c3aed,#2563eb)',boxShadow:'0 4px 15px rgba(124,58,237,.3)'}:{}}>{lbl}</button>
+          ))}
+        </div>
+
         <form onSubmit={submit} className="space-y-4">
+          {mode==='register' && (
+            <div><Lbl>Full Name</Lbl><Inp type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Enter your name" required/></div>
+          )}
           <div><Lbl>Email Address</Lbl><Inp type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="university@mitadt.edu" required/></div>
-          <div><Lbl>Password</Lbl><Inp type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="Enter your password" required/></div>
+          <div><Lbl>Password</Lbl><Inp type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="••••••••" required/></div>
+          
           {err&&<div className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{err}</div>}
-          <BtnS onClick={autofill} cls="w-full justify-center text-center">✨ Autofill Demo Credentials</BtnS>
-          <button type="submit" disabled={loading} className="btn-p w-full py-3 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2">
-            {loading?<><span style={{animation:'spin .8s linear infinite',display:'inline-block'}}>⟳</span> Authenticating...</>:<>🔐 Sign In to {role==='admin'?'Admin':'Student'} Dashboard</>}
-          </button>
+          
+          <div className="flex gap-2">
+            <BtnS onClick={autofill} cls="flex-1 justify-center text-center text-xs">✨ Autofill</BtnS>
+            <button type="submit" disabled={loading} className="btn-p flex-[2] py-2.5 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2">
+              {loading?<><span style={{animation:'spin .8s linear infinite',display:'inline-block'}}>⟳</span> Connecting...</>:<> {mode==='login'?'Sign In':'Create Account'}</>}
+            </button>
+          </div>
         </form>
-        <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-2 gap-1 text-xs text-gray-600">
+        
+        <div className="mt-6 pt-4 border-t border-white/10 grid grid-cols-2 gap-1 text-[10px] text-gray-600">
           <span>🔒 Hyperledger Fabric</span><span className="text-right">⚡ 3,482 TPS</span>
           <span>🌐 12 Active Nodes</span><span className="text-right">🛡 ZK Auth</span>
         </div>

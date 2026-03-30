@@ -1,21 +1,45 @@
-var MyWalletPage=({user,users,setUsers,txns,toast})=>{
+var MyWalletPage=({user,users,setUsers,txns,toast,block})=>{
+  var [realBalance, setRealBalance] = useState('0');
   var me=users.find(u=>u.id===user.id)||users[1];
+  
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        if (!user.walletAddress) {
+            console.log("⚠️ No walletAddress for current user");
+            return;
+        }
+        const provider = CampusAPI.getProvider();
+        if (!provider) return;
+        const contract = CampusAPI.getContract('CampusCoin', provider);
+        const bal = await contract.balanceOf(user.walletAddress);
+        setRealBalance(ethers.utils.formatUnits(bal, 18).split('.')[0]); 
+      } catch (e) { console.error("Balance fetch error:", e); }
+    };
+    fetchBalance();
+  }, [user.walletAddress, block]);
+
   var [modal,setModal]=useState(null);
   var [topForm,setTopForm]=useState({amount:'',upi:''});
   var myTxns=txns.filter(t=>t.sname===me.name);
   var tip=useMemo(()=>rnd(AI_TIPS),[]);
-  var topUp=()=>{
+  var topUp=async ()=>{
     var amt=Number(topForm.amount);if(!amt||amt<=0)return;
-    setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance+amt}:u));
-    toast('success','Top-Up Successful!',`${fmtINR(amt)} added to your wallet`);
-    setTopForm({amount:'',upi:''});setModal(null);
+    // In a real app, this would trigger a payment gateway and THEN update backend
+    try {
+      const res = await CampusAPI.updateUser(me.id, { balance: me.balance + amt });
+      if (res.error) throw new Error(res.error);
+      setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance+amt}:u));
+      toast('success','Top-Up Successful!',`${fmtINR(amt)} added to your wallet`);
+      setTopForm({amount:'',upi:''});setModal(null);
+    } catch (err) { toast('error', 'Top-Up Failed', err.message); }
   };
   return(
     <div className="p-6 space-y-6">
       <div className="glass rounded-3xl p-8 text-center glow-p" style={{border:'1px solid rgba(124,58,237,.4)'}}>
         <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">CampusCoin Balance</div>
-        <div className="text-5xl font-bold text-white font-mono mb-1">{fmtINR(me.balance)}</div>
-        <div className="text-sm text-purple-400 mb-6">≈ {me.balance} CampusCoin</div>
+        <div className="text-5xl font-bold text-white font-mono mb-1">{fmtINR(realBalance)}</div>
+        <div className="text-sm text-purple-400 mb-6">≈ {realBalance} CampusCoin</div>
         <BtnP onClick={()=>setModal('topup')} cls="px-8">💳 Top-Up via UPI</BtnP>
       </div>
       <div className="glass rounded-2xl p-5" style={{border:'1px solid rgba(13,148,136,.3)'}}>
@@ -53,14 +77,33 @@ var MyFeesPage=({user,users,setUsers,fees,setFees,addTxn,addAudit,toast})=>{
   var myFees=fees.filter(f=>f.sid===me.id);
   var pending=myFees.filter(f=>f.status==='Pending');
   var confirmed=myFees.filter(f=>f.status==='Confirmed');
-  var pay=f=>{
-    if(me.balance<f.amount){toast('error','Insufficient Balance',`Need ${fmtINR(f.amount)}, have ${fmtINR(me.balance)}`);return;}
-    var hash=genHash();
-    setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance-f.amount}:u));
-    setFees(prev=>prev.map(x=>x.id===f.id?{...x,status:'Confirmed',txHash:hash,paidAt:fmtNow()}:x));
-    addTxn({type:'FEE_PAYMENT',sname:me.name,amount:f.amount,service:f.cat,status:'CONFIRMED'});
-    addAudit('FEE_PAID',me.name,`Paid ${f.cat} fee: ${fmtINR(f.amount)}`);
-    toast('success','Payment Successful!',`${f.cat} — Tx: ${hash}`);
+  var pay = async f => {
+    try {
+      const addr = await CampusAPI.connectWallet();
+      const provider = CampusAPI.getProvider();
+      const signer = provider.getSigner();
+
+      toast('info', 'Blockchain', 'Requesting Approval...');
+      const coin = CampusAPI.getContract('CampusCoin', signer);
+      const approveTx = await coin.approve(CONTRACTS.FeePayment.address, ethers.utils.parseUnits(f.amount.toString(), 18));
+      await approveTx.wait();
+
+      toast('info', 'Blockchain', 'Processing Payment...');
+      const feeContract = CampusAPI.getContract('FeePayment', signer);
+      const payTx = await feeContract.payFee(f.id, ethers.utils.formatBytes32String(genHash().substr(0,10)));
+      await payTx.wait();
+
+      // Update Backend
+      await CampusAPI.updateFee(f.id, { status: 'Confirmed', paidAt: new Date().toISOString(), txHash: payTx.hash });
+      
+      setFees(prev=>prev.map(x=>x.id===f.id?{...x,status:'Confirmed',txHash:payTx.hash,paidAt:fmtNow()}:x));
+      addTxn({type:'FEE_PAYMENT',sname:me.name,amount:f.amount,service:f.cat,status:'CONFIRMED'});
+      addAudit('FEE_PAID',me.name,`Paid ${f.cat} fee on-chain: ${fmtINR(f.amount)}`);
+      toast('success','Payment Successful!',`Confirmed on-chain · Tx: ${payTx.hash.substr(0,10)}...`);
+    } catch (err) {
+      console.error(err);
+      toast('error','Payment Failed', err.message.includes('user rejected') ? 'Transaction rejected' : err.message);
+    }
   };
   return(
     <div className="p-6 space-y-6">
@@ -101,17 +144,38 @@ var EventsTicketsPage=({user,users,setUsers,events,setEvents,nfts,setNfts,addTxn
   var me=users.find(u=>u.id===user.id)||users[1];
   var myTickets=nfts.filter(n=>n.sid===me.id);
   var [rec,setRec]=useState('');
-  var buy=ev=>{
-    if(me.balance<ev.price){toast('error','Insufficient Balance',`Need ${fmtINR(ev.price)}`);return;}
-    if(myTickets.find(t=>t.eid===ev.id)){toast('warning','Already Purchased','You own a ticket for this event');return;}
-    var token='TKT-'+genHash().substr(2,6);
-    var seat='S-'+Math.floor(Math.random()*200+1);
-    setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance-ev.price}:u));
-    setEvents(prev=>prev.map(e=>e.id===ev.id?{...e,sold:e.sold+1}:e));
-    setNfts(prev=>[...prev,{id:'NFT-'+String(nextId(prev)).padStart(3,'0'),sid:me.id,sname:me.name,eid:ev.id,ename:ev.name,seat,ts:fmtNow(),token}]);
-    addTxn({type:'TOKEN_MINT',sname:me.name,amount:ev.price,service:'Event Ticket',status:'CONFIRMED'});
-    addAudit('TICKET_PURCHASED',me.name,`Bought ticket for ${ev.name}`);
-    toast('success','Ticket Purchased!',`Token: ${token} · Seat: ${seat}`);
+  var buy = async ev => {
+    try {
+      const addr = await CampusAPI.connectWallet();
+      const provider = CampusAPI.getProvider();
+      const signer = provider.getSigner();
+
+      if (myTickets.find(t => t.eid === ev.id)) {
+        toast('warning', 'Already Purchased', 'You own a ticket for this event');
+        return;
+      }
+
+      toast('info', 'Blockchain', 'Requesting Approval...');
+      const coin = CampusAPI.getContract('CampusCoin', signer);
+      const approveTx = await coin.approve(CONTRACTS.EventTicket.address, ethers.utils.parseUnits(ev.price.toString(), 18));
+      await approveTx.wait();
+
+      toast('info', 'Blockchain', 'Minting Ticket NFT...');
+      const ticketContract = CampusAPI.getContract('EventTicket', signer);
+      const seat = 'S-' + Math.floor(Math.random() * 200 + 1);
+      const mintTx = await ticketContract.mintTicket(user.wallet, ev.id, seat);
+      await mintTx.wait();
+
+      const token = 'TKT-' + genHash().substr(2, 6);
+      setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, sold: e.sold + 1 } : e));
+      setNfts(prev => [...prev, { id: 'NFT-' + String(nextId(prev)).padStart(3, '0'), sid: me.id, sname: me.name, eid: ev.id, ename: ev.name, seat, ts: fmtNow(), token, txHash: mintTx.hash }]);
+      addTxn({ type: 'TOKEN_MINT', sname: me.name, amount: ev.price, service: 'Event Ticket', status: 'CONFIRMED' });
+      addAudit('TICKET_PURCHASED', me.name, `Bought ticket for ${ev.name} on-chain`);
+      toast('success', 'Ticket Purchased!', `NFT Minted · Tx: ${mintTx.hash.substr(0,10)}...`);
+    } catch (err) {
+      console.error(err);
+      toast('error', 'Purchase Failed', err.message.includes('user rejected') ? 'Transaction rejected' : err.message);
+    }
   };
   return(
     <div className="p-6 space-y-6">
@@ -160,18 +224,32 @@ var P2PTransferPage=({user,users,setUsers,addTxn,addAudit,policies,toast})=>{
   var [ledger,setLedger]=useState([]);
   var [tab,setTab]=useState('Send');
   var limit=policies.find(p=>p.id===2);
-  var send=()=>{
-    var amt=Number(form.amount);var rec=users.find(u=>u.id===Number(form.rid));
-    if(!rec||!amt||amt<=0){toast('error','Invalid Transfer','Check recipient and amount');return;}
-    if(limit?.enabled&&amt>limit.val){toast('warning','Limit Exceeded',`Max P2P: ${fmtINR(limit.val)}`);return;}
-    if(me.balance<amt){toast('error','Insufficient Balance',fmtINR(me.balance));return;}
-    setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance-amt}:u.id===rec.id?{...u,balance:u.balance+amt}:u));
-    var entry={id:nextId(ledger),from:me.name,to:rec.name,amount:amt,note:form.note,ts:fmtNow(),hash:genHash()};
-    setLedger(prev=>[...prev,entry]);
-    addTxn({type:'P2P_XFER',sname:me.name,amount:amt,service:'P2P',status:'CONFIRMED'});
-    addAudit('P2P_TRANSFER',me.name,`Transfer ${fmtINR(amt)} to ${rec.name}`);
-    toast('success','Transfer Sent!',`${fmtINR(amt)} → ${rec.name}`);
-    setForm({rid:'',amount:'',note:''});
+  var send = async () => {
+    var amt = Number(form.amount); var rec = users.find(u => u.id === Number(form.rid));
+    if (!rec || !amt || amt <= 0) { toast('error', 'Invalid Transfer', 'Check recipient and amount'); return; }
+    if (limit?.enabled && amt > limit.val) { toast('warning', 'Limit Exceeded', `Max P2P: ${fmtINR(limit.val)}`); return; }
+
+    try {
+      const addr = await CampusAPI.connectWallet();
+      const provider = CampusAPI.getProvider();
+      const signer = provider.getSigner();
+
+      toast('info', 'Blockchain', 'Sending CampusCoins...');
+      const coin = CampusAPI.getContract('CampusCoin', signer);
+      const tx = await coin.transfer(rec.wallet, ethers.utils.parseUnits(amt.toString(), 18));
+      await tx.wait();
+
+      // Update local state and audit
+      var entry = { id: nextId(ledger), from: me.name, to: rec.name, amount: amt, note: form.note, ts: fmtNow(), hash: tx.hash };
+      setLedger(prev => [...prev, entry]);
+      addTxn({ type: 'P2P_XFER', sname: me.name, amount: amt, service: 'P2P', status: 'CONFIRMED', hash: tx.hash });
+      addAudit('P2P_TRANSFER', me.name, `Transfer ${fmtINR(amt)} to ${rec.name} on-chain`);
+      toast('success', 'Transfer Successful!', `Tx: ${tx.hash.substr(0,10)}...`);
+      setForm({ rid: '', amount: '', note: '' });
+    } catch (err) {
+      console.error(err);
+      toast('error', 'Transfer Failed', err.message.includes('user rejected') ? 'Transaction rejected' : err.message);
+    }
   };
   var sent=ledger.filter(l=>l.from===me.name);
   var received=ledger.filter(l=>l.to===me.name);
@@ -209,7 +287,7 @@ var P2PTransferPage=({user,users,setUsers,addTxn,addAudit,policies,toast})=>{
 var MyProfilePage=({user,users,txns,fees,nfts})=>{
   var me=users.find(u=>u.id===user.id)||users[1];
   var [copied,setCopied]=useState(false);
-  var copyWallet=()=>{navigator.clipboard?.writeText(me.wallet).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
+  var copyWallet=()=>{navigator.clipboard?.writeText(me.walletAddress).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
   var myTxns=txns.filter(t=>t.sname===me.name).length;
   var myFees=fees.filter(f=>f.sid===me.id&&f.status==='Confirmed').length;
   var myTickets=nfts.filter(n=>n.sid===me.id).length;
@@ -223,13 +301,13 @@ var MyProfilePage=({user,users,txns,fees,nfts})=>{
             <div className="flex items-center gap-2 mt-1"><Badge type={me.role} text={me.role}/>{me.rollNo&&<span className="text-xs text-gray-500">{me.rollNo}</span>}</div>
             <div className="text-sm text-gray-400 mt-1">{me.dept}{me.sem?` · Semester ${me.sem}`:''}</div>
           </div>
-          <div className="text-right"><div className="text-xs text-gray-500 mb-1">CampusCoin Balance</div><div className="text-2xl font-bold font-mono text-white">{fmtINR(me.balance)}</div></div>
+          <div className="text-right"><div className="text-xs text-gray-500 mb-1">CampusCoin Balance</div><div className="text-2xl font-bold font-mono text-white">{fmtINR(realBalance)}</div></div>
         </div>
       </div>
       <div className="glass rounded-2xl p-5">
         <h3 className="text-sm font-semibold text-white mb-3">Wallet Address</h3>
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)'}}>
-          <span className="font-mono text-purple-300 text-sm flex-1 break-all">{me.wallet}</span>
+          <span className="font-mono text-purple-300 text-sm flex-1 break-all">{me.walletAddress}</span>
           <button onClick={copyWallet} className="text-xs shrink-0 px-3 py-1.5 rounded-lg transition-all" style={{background:'rgba(124,58,237,.2)',border:'1px solid rgba(124,58,237,.3)',color:copied?'#4ade80':'#a78bfa'}}>{copied?'✅ Copied':'📋 Copy'}</button>
         </div>
       </div>
