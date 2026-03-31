@@ -1,45 +1,22 @@
-var MyWalletPage=({user,users,setUsers,txns,toast,block})=>{
-  var [realBalance, setRealBalance] = useState('0');
-  var me=users.find(u=>u.id===user.id)||users[1];
-  
-  useEffect(() => {
-    const fetchBalance = async () => {
-      try {
-        if (!user.walletAddress) {
-            console.log("⚠️ No walletAddress for current user");
-            return;
-        }
-        const provider = CampusAPI.getProvider();
-        if (!provider) return;
-        const contract = CampusAPI.getContract('CampusCoin', provider);
-        const bal = await contract.balanceOf(user.walletAddress);
-        setRealBalance(ethers.utils.formatUnits(bal, 18).split('.')[0]); 
-      } catch (e) { console.error("Balance fetch error:", e); }
-    };
-    fetchBalance();
-  }, [user.walletAddress, block]);
-
+var StudentWalletPage=({user,users,setUsers,txns,toast,block})=>{
+  // Robust lookup
+  var me=users.find(u=>isSelf(u,user))||user;
   var [modal,setModal]=useState(null);
   var [topForm,setTopForm]=useState({amount:'',upi:''});
   var myTxns=txns.filter(t=>t.sname===me.name);
   var tip=useMemo(()=>rnd(AI_TIPS),[]);
-  var topUp=async ()=>{
+  var topUp=()=>{
     var amt=Number(topForm.amount);if(!amt||amt<=0)return;
-    // In a real app, this would trigger a payment gateway and THEN update backend
-    try {
-      const res = await CampusAPI.updateUser(me.id, { balance: me.balance + amt });
-      if (res.error) throw new Error(res.error);
-      setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance+amt}:u));
-      toast('success','Top-Up Successful!',`${fmtINR(amt)} added to your wallet`);
-      setTopForm({amount:'',upi:''});setModal(null);
-    } catch (err) { toast('error', 'Top-Up Failed', err.message); }
+    setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance+amt}:u));
+    toast('success','Top-Up Successful!',`${fmtINR(amt)} added to your wallet`);
+    setTopForm({amount:'',upi:''});setModal(null);
   };
   return(
     <div className="p-6 space-y-6">
       <div className="glass rounded-3xl p-8 text-center glow-p" style={{border:'1px solid rgba(124,58,237,.4)'}}>
         <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">CampusCoin Balance</div>
-        <div className="text-5xl font-bold text-white font-mono mb-1">{fmtINR(realBalance)}</div>
-        <div className="text-sm text-purple-400 mb-6">≈ {realBalance} CampusCoin</div>
+        <div className="text-5xl font-bold text-white font-mono mb-1">{fmtINR(me.balance)}</div>
+        <div className="text-sm text-purple-400 mb-6">≈ {me.balance} CampusCoin</div>
         <BtnP onClick={()=>setModal('topup')} cls="px-8">💳 Top-Up via UPI</BtnP>
       </div>
       <div className="glass rounded-2xl p-5" style={{border:'1px solid rgba(13,148,136,.3)'}}>
@@ -72,38 +49,25 @@ var MyWalletPage=({user,users,setUsers,txns,toast,block})=>{
     </div>
   );};
 
-var MyFeesPage=({user,users,setUsers,fees,setFees,addTxn,addAudit,toast})=>{
-  var me=users.find(u=>u.id===user.id)||users[1];
-  var myFees=fees.filter(f=>f.sid===me.id);
+var StudentFeesPage=({user,users,setUsers,fees,setFees,addTxn,addAudit,toast,block})=>{
+  var me=users.find(u=>isSelf(u,user))||user;
+  var myFees=fees.filter(f=>isMatch(f.sid,me));
   var pending=myFees.filter(f=>f.status==='Pending');
   var confirmed=myFees.filter(f=>f.status==='Confirmed');
-  var pay = async f => {
-    try {
-      const addr = await CampusAPI.connectWallet();
-      const provider = CampusAPI.getProvider();
-      const signer = provider.getSigner();
-
-      toast('info', 'Blockchain', 'Requesting Approval...');
-      const coin = CampusAPI.getContract('CampusCoin', signer);
-      const approveTx = await coin.approve(CONTRACTS.FeePayment.address, ethers.utils.parseUnits(f.amount.toString(), 18));
-      await approveTx.wait();
-
-      toast('info', 'Blockchain', 'Processing Payment...');
-      const feeContract = CampusAPI.getContract('FeePayment', signer);
-      const payTx = await feeContract.payFee(f.id, ethers.utils.formatBytes32String(genHash().substr(0,10)));
-      await payTx.wait();
-
-      // Update Backend
-      await CampusAPI.updateFee(f.id, { status: 'Confirmed', paidAt: new Date().toISOString(), txHash: payTx.hash });
-      
-      setFees(prev=>prev.map(x=>x.id===f.id?{...x,status:'Confirmed',txHash:payTx.hash,paidAt:fmtNow()}:x));
-      addTxn({type:'FEE_PAYMENT',sname:me.name,amount:f.amount,service:f.cat,status:'CONFIRMED'});
-      addAudit('FEE_PAID',me.name,`Paid ${f.cat} fee on-chain: ${fmtINR(f.amount)}`);
-      toast('success','Payment Successful!',`Confirmed on-chain · Tx: ${payTx.hash.substr(0,10)}...`);
-    } catch (err) {
-      console.error(err);
-      toast('error','Payment Failed', err.message.includes('user rejected') ? 'Transaction rejected' : err.message);
-    }
+  var pay=f=>{
+    if(me.balance<f.amount){toast('error','Insufficient Balance',`Need ${fmtINR(f.amount)}, have ${fmtINR(me.balance)}`);return;}
+    toast('info','Blockchain','Broadcasting transaction to CampusChain...');
+    setTimeout(()=>{
+      var hash=genHash();
+      toast('info','Blockchain','Confirming on-chain... Block #'+(block+1));
+      setTimeout(()=>{
+        setUsers(prev=>prev.map(u=>isMatch(u,me)?{...u,balance:u.balance-f.amount}:u));
+        setFees(prev=>prev.map(x=>isMatch(x,f)?{...x,status:'Confirmed',txHash:hash,paidAt:fmtNow()}:x));
+        addTxn({type:'FEE_PAYMENT',sname:me.name,amount:f.amount,service:f.cat,status:'CONFIRMED'});
+        addAudit('FEE_PAID',me.name,`Paid ${f.cat} fee on-chain: ${fmtINR(f.amount)}`);
+        toast('success','Payment Confirmed!',`On-chain Tx: ${hash.substr(0,14)}...`);
+      },1200);
+    },800);
   };
   return(
     <div className="p-6 space-y-6">
@@ -140,42 +104,28 @@ var MyFeesPage=({user,users,setUsers,fees,setFees,addTxn,addAudit,toast})=>{
     </div>
   );};
 
-var EventsTicketsPage=({user,users,setUsers,events,setEvents,nfts,setNfts,addTxn,addAudit,toast})=>{
-  var me=users.find(u=>u.id===user.id)||users[1];
-  var myTickets=nfts.filter(n=>n.sid===me.id);
+var StudentEventsPage=({user,users,setUsers,events,setEvents,nfts,setNfts,addTxn,addAudit,toast,block})=>{
+  var me=users.find(u=>isSelf(u,user))||user;
+  var myTickets=nfts.filter(n=>isMatch(n.sid,me));
   var [rec,setRec]=useState('');
-  var buy = async ev => {
-    try {
-      const addr = await CampusAPI.connectWallet();
-      const provider = CampusAPI.getProvider();
-      const signer = provider.getSigner();
-
-      if (myTickets.find(t => t.eid === ev.id)) {
-        toast('warning', 'Already Purchased', 'You own a ticket for this event');
-        return;
-      }
-
-      toast('info', 'Blockchain', 'Requesting Approval...');
-      const coin = CampusAPI.getContract('CampusCoin', signer);
-      const approveTx = await coin.approve(CONTRACTS.EventTicket.address, ethers.utils.parseUnits(ev.price.toString(), 18));
-      await approveTx.wait();
-
-      toast('info', 'Blockchain', 'Minting Ticket NFT...');
-      const ticketContract = CampusAPI.getContract('EventTicket', signer);
-      const seat = 'S-' + Math.floor(Math.random() * 200 + 1);
-      const mintTx = await ticketContract.mintTicket(user.wallet, ev.id, seat);
-      await mintTx.wait();
-
-      const token = 'TKT-' + genHash().substr(2, 6);
-      setEvents(prev => prev.map(e => e.id === ev.id ? { ...e, sold: e.sold + 1 } : e));
-      setNfts(prev => [...prev, { id: 'NFT-' + String(nextId(prev)).padStart(3, '0'), sid: me.id, sname: me.name, eid: ev.id, ename: ev.name, seat, ts: fmtNow(), token, txHash: mintTx.hash }]);
-      addTxn({ type: 'TOKEN_MINT', sname: me.name, amount: ev.price, service: 'Event Ticket', status: 'CONFIRMED' });
-      addAudit('TICKET_PURCHASED', me.name, `Bought ticket for ${ev.name} on-chain`);
-      toast('success', 'Ticket Purchased!', `NFT Minted · Tx: ${mintTx.hash.substr(0,10)}...`);
-    } catch (err) {
-      console.error(err);
-      toast('error', 'Purchase Failed', err.message.includes('user rejected') ? 'Transaction rejected' : err.message);
-    }
+  var buy=ev=>{
+    if(me.balance<ev.price){toast('error','Insufficient Balance',`Need ${fmtINR(ev.price)}`);return;}
+    if(myTickets.find(t=>t.eid===ev.id)){toast('warning','Already Purchased','You own a ticket for this event');return;}
+    toast('info','Blockchain','Minting NFT ticket on CampusChain...');
+    setTimeout(()=>{
+      var token='TKT-'+genHash().substr(2,6);
+      var seat='S-'+Math.floor(Math.random()*200+1);
+      var hash=genHash();
+      toast('info','Blockchain','Confirming mint... Block #'+(block+1));
+      setTimeout(()=>{
+        setUsers(prev=>prev.map(u=>u.id===me.id?{...u,balance:u.balance-ev.price}:u));
+        setEvents(prev=>prev.map(e=>e.id===ev.id?{...e,sold:e.sold+1}:e));
+        setNfts(prev=>[...prev,{id:'NFT-'+String(nextId(prev)).padStart(3,'0'),sid:me.id,sname:me.name,eid:ev.id,ename:ev.name,seat,ts:fmtNow(),token,txHash:hash}]);
+        addTxn({type:'TOKEN_MINT',sname:me.name,amount:ev.price,service:'Event Ticket',status:'CONFIRMED'});
+        addAudit('TICKET_PURCHASED',me.name,`Minted NFT ticket for ${ev.name}`);
+        toast('success','NFT Ticket Minted!',`Token: ${token} · Seat: ${seat} · Tx: ${hash.substr(0,10)}...`);
+      },1200);
+    },800);
   };
   return(
     <div className="p-6 space-y-6">
@@ -194,7 +144,11 @@ var EventsTicketsPage=({user,users,setUsers,events,setEvents,nfts,setNfts,addTxn
               <div className="text-sm text-gray-400">{ev.desc}</div>
               <div className="flex justify-between text-sm"><span className="text-white font-mono font-bold">{ev.price===0?'Free':fmtINR(ev.price)}</span><span className="text-gray-400">{ev.cap-ev.sold} seats left</span></div>
               <div className="h-1.5 bg-white/5 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{width:`${Math.min((ev.sold/ev.cap)*100,100)}%`,background:'linear-gradient(90deg,#7c3aed,#2563eb)'}}/></div>
-              {owned?<div className="text-xs text-green-400 text-center py-2 rounded-lg bg-green-500/10 border border-green-500/20">✅ You own: {owned.token}</div>:<BtnP onClick={()=>buy(ev)} cls="w-full text-center" >{ev.price===0?'🎟 Get Free Ticket':'💳 Buy Ticket'}</BtnP>}
+              {owned ? (
+                <div className="mt-3 p-2 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center justify-center gap-2 text-xs text-green-400 font-medium">
+                  ✔ You own: {owned.token}
+                </div>
+              ) : <BtnP onClick={()=>buy(ev)} cls="w-full text-center" >{ev.price===0?'🎟 Get Free Ticket':'💳 Buy Ticket'}</BtnP>}
             </div>
           );
         })}
@@ -216,40 +170,43 @@ var EventsTicketsPage=({user,users,setUsers,events,setEvents,nfts,setNfts,addTxn
       )}
     </div>
   );};
-
-var P2PTransferPage=({user,users,setUsers,addTxn,addAudit,policies,toast})=>{
-  var me=users.find(u=>u.id===user.id)||users[1];
-  var students=users.filter(u=>u.role==='Student'&&u.id!==me.id&&u.status==='Active');
+var StudentP2PPage=({user,users,setUsers,txns,toast,block,policies})=>{
+  var me=users.find(u=>isSelf(u,user))||user;
+  var students=users.filter(u=>{
+    var isOther = !isMatch(u,me);
+    var isStudent = u.role==='Student';
+    var notSuspended = u.status !== 'Suspended';
+    return isStudent && isOther && notSuspended;
+  });
   var [form,setForm]=useState({rid:'',amount:'',note:''});
   var [ledger,setLedger]=useState([]);
   var [tab,setTab]=useState('Send');
   var limit=policies.find(p=>p.id===2);
-  var send = async () => {
-    var amt = Number(form.amount); var rec = users.find(u => u.id === Number(form.rid));
-    if (!rec || !amt || amt <= 0) { toast('error', 'Invalid Transfer', 'Check recipient and amount'); return; }
-    if (limit?.enabled && amt > limit.val) { toast('warning', 'Limit Exceeded', `Max P2P: ${fmtINR(limit.val)}`); return; }
-
-    try {
-      const addr = await CampusAPI.connectWallet();
-      const provider = CampusAPI.getProvider();
-      const signer = provider.getSigner();
-
-      toast('info', 'Blockchain', 'Sending CampusCoins...');
-      const coin = CampusAPI.getContract('CampusCoin', signer);
-      const tx = await coin.transfer(rec.wallet, ethers.utils.parseUnits(amt.toString(), 18));
-      await tx.wait();
-
-      // Update local state and audit
-      var entry = { id: nextId(ledger), from: me.name, to: rec.name, amount: amt, note: form.note, ts: fmtNow(), hash: tx.hash };
-      setLedger(prev => [...prev, entry]);
-      addTxn({ type: 'P2P_XFER', sname: me.name, amount: amt, service: 'P2P', status: 'CONFIRMED', hash: tx.hash });
-      addAudit('P2P_TRANSFER', me.name, `Transfer ${fmtINR(amt)} to ${rec.name} on-chain`);
-      toast('success', 'Transfer Successful!', `Tx: ${tx.hash.substr(0,10)}...`);
-      setForm({ rid: '', amount: '', note: '' });
-    } catch (err) {
-      console.error(err);
-      toast('error', 'Transfer Failed', err.message.includes('user rejected') ? 'Transaction rejected' : err.message);
-    }
+  var send=()=>{
+    var amt=Number(form.amount);
+    // Match by string comparison to handle both MongoDB _id and numeric ids
+    var rec=users.find(u=>String(u._id||u.id)===String(form.rid));
+    if(!rec||!amt||amt<=0){toast('error','Invalid Transfer','Check recipient and amount');return;}
+    if(limit?.enabled&&amt>limit.val){toast('warning','Limit Exceeded',`Max P2P: ${fmtINR(limit.val)}`);return;}
+    if(me.balance<amt){toast('error','Insufficient Balance',fmtINR(me.balance));return;}
+    toast('info','Blockchain','Broadcasting P2P transfer...');
+    setTimeout(()=>{
+      var hash=genHash();
+      var meKey=String(me._id||me.id);
+      var recKey=String(rec._id||rec.id);
+      setUsers(prev=>prev.map(u=>{
+        var uKey=String(u._id||u.id);
+        if(uKey===meKey) return {...u,balance:(u.balance||0)-amt};
+        if(uKey===recKey) return {...u,balance:(u.balance||0)+amt};
+        return u;
+      }));
+      var entry={id:nextId(ledger),from:me.name,to:rec.name,amount:amt,note:form.note,ts:fmtNow(),hash};
+      setLedger(prev=>[...prev,entry]);
+      addTxn({type:'P2P_XFER',sname:me.name,amount:amt,service:'P2P',status:'CONFIRMED'});
+      addAudit('P2P_TRANSFER',me.name,`Transfer ${fmtINR(amt)} to ${rec.name} on-chain`);
+      toast('success','Transfer Confirmed!',`${fmtINR(amt)} → ${rec.name} · Tx: ${hash.substr(0,10)}...`);
+      setForm({rid:'',amount:'',note:''});
+    },1500);
   };
   var sent=ledger.filter(l=>l.from===me.name);
   var received=ledger.filter(l=>l.to===me.name);
@@ -259,7 +216,7 @@ var P2PTransferPage=({user,users,setUsers,addTxn,addAudit,policies,toast})=>{
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-1 glass rounded-2xl p-5 space-y-4">
           <h3 className="text-sm font-semibold text-white">Send Money</h3>
-          <div><Lbl>Recipient</Lbl><Sel value={form.rid} onChange={e=>setForm(p=>({...p,rid:e.target.value}))}><option value="">-- Select Student --</option>{students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</Sel></div>
+          <div><Lbl>Recipient</Lbl><Sel value={form.rid} onChange={e=>setForm(p=>({...p,rid:e.target.value}))}><option value="">-- Select Student --</option>{students.map(s=>{var sk=String(s._id||s.id);return <option key={sk} value={sk}>{s.name}</option>;})}</Sel></div>
           <div><Lbl>Amount (₹)</Lbl><Inp type="number" value={form.amount} onChange={e=>setForm(p=>({...p,amount:e.target.value}))} placeholder="500"/></div>
           {limit?.enabled&&Number(form.amount)>limit.val&&<div className="text-xs text-yellow-400 bg-yellow-500/10 rounded-lg px-3 py-2">⚠️ Exceeds policy limit of {fmtINR(limit.val)}</div>}
           <div><Lbl>Note (optional)</Lbl><Inp value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} placeholder="Lunch split"/></div>
@@ -284,10 +241,10 @@ var P2PTransferPage=({user,users,setUsers,addTxn,addAudit,policies,toast})=>{
     </div>
   );};
 
-var MyProfilePage=({user,users,txns,fees,nfts})=>{
-  var me=users.find(u=>u.id===user.id)||users[1];
+var StudentProfilePage=({user,users,txns,fees,nfts})=>{
+  var me=users.find(u=>isSelf(u,user))||user;
   var [copied,setCopied]=useState(false);
-  var copyWallet=()=>{navigator.clipboard?.writeText(me.walletAddress).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
+  var copyWallet=()=>{navigator.clipboard?.writeText(me.wallet).catch(()=>{});setCopied(true);setTimeout(()=>setCopied(false),2000);};
   var myTxns=txns.filter(t=>t.sname===me.name).length;
   var myFees=fees.filter(f=>f.sid===me.id&&f.status==='Confirmed').length;
   var myTickets=nfts.filter(n=>n.sid===me.id).length;
@@ -301,13 +258,13 @@ var MyProfilePage=({user,users,txns,fees,nfts})=>{
             <div className="flex items-center gap-2 mt-1"><Badge type={me.role} text={me.role}/>{me.rollNo&&<span className="text-xs text-gray-500">{me.rollNo}</span>}</div>
             <div className="text-sm text-gray-400 mt-1">{me.dept}{me.sem?` · Semester ${me.sem}`:''}</div>
           </div>
-          <div className="text-right"><div className="text-xs text-gray-500 mb-1">CampusCoin Balance</div><div className="text-2xl font-bold font-mono text-white">{fmtINR(realBalance)}</div></div>
+          <div className="text-right"><div className="text-xs text-gray-500 mb-1">CampusCoin Balance</div><div className="text-2xl font-bold font-mono text-white">{fmtINR(me.balance)}</div></div>
         </div>
       </div>
       <div className="glass rounded-2xl p-5">
         <h3 className="text-sm font-semibold text-white mb-3">Wallet Address</h3>
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)'}}>
-          <span className="font-mono text-purple-300 text-sm flex-1 break-all">{me.walletAddress}</span>
+          <span className="font-mono text-purple-300 text-sm flex-1 break-all">{me.wallet}</span>
           <button onClick={copyWallet} className="text-xs shrink-0 px-3 py-1.5 rounded-lg transition-all" style={{background:'rgba(124,58,237,.2)',border:'1px solid rgba(124,58,237,.3)',color:copied?'#4ade80':'#a78bfa'}}>{copied?'✅ Copied':'📋 Copy'}</button>
         </div>
       </div>

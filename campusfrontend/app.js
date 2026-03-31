@@ -92,8 +92,12 @@ var App=()=>{
 
   var login=useCallback(u=>{
     setUser(u);
-    setPage(u.role==='admin'?'overview':'my-wallet');
-    toast('success',`Welcome, ${u.name}!`,u.role==='admin'?'Admin Dashboard':'Student Dashboard');
+    // Extremely robust role check: handles casing, spacing, and specific admin emails
+    const roleStr = String(u.role || '').trim().toLowerCase();
+    const isAdmin = roleStr === 'admin' || u.email === 'meera@mitadt.edu';
+    
+    setPage(isAdmin ? 'overview' : 'my-wallet');
+    toast('success', `Welcome, ${u.name}!`, isAdmin ? 'Admin Dashboard' : 'Student Dashboard');
   },[]);
 
   var logout=useCallback(()=>{setUser(null);setPage('overview');},[]);
@@ -140,26 +144,26 @@ var App=()=>{
 
   var adminPage=()=>{
     switch(page){
-      case 'overview': return <OverviewPage txns={txns} liveEvents={liveEvents} addAudit={addAudit}/>;
-      case 'fee-portal': return <FeePortalPage fees={fees} setFees={setFees} users={users} addAudit={addAudit} addTxn={addTxn} toast={toast}/>;
-      case 'event-tickets': return <EventTicketsPage events={events} setEvents={setEvents} users={users} nfts={nfts} setNfts={setNfts} addAudit={addAudit} addTxn={addTxn} toast={toast}/>;
-      case 'p2p-transactions': return <P2PAdminPage txns={txns}/>;
-      case 'disputes': return <DisputesPage disputes={disputes} setDisputes={setDisputes} addAudit={addAudit} toast={toast}/>;
-      case 'users-roles': return <UsersRolesPage users={users} setUsers={setUsers} addAudit={addAudit} toast={toast}/>;
-      case 'policy-config': return <PolicyConfigPage policies={policies} setPolicies={setPolicies} addAudit={addAudit} toast={toast}/>;
-      case 'audit-trail': return <AuditTrailPage auditLog={auditLog}/>;
-      default: return <OverviewPage txns={txns} liveEvents={liveEvents} addAudit={addAudit}/>;
+      case 'overview': return <AdminOverviewPage txns={txns} liveEvents={liveEvents} addAudit={addAudit}/>;
+      case 'fee-portal': return <AdminFeePortalPage user={user} fees={fees} setFees={setFees} users={users} addAudit={addAudit} addTxn={addTxn} toast={toast}/>;
+      case 'event-tickets': return <AdminEventsPage user={user} events={events} setEvents={setEvents} users={users} nfts={nfts} setNfts={setNfts} addAudit={addAudit} addTxn={addTxn} toast={toast}/>;
+      case 'p2p-transactions': return <AdminP2PPage txns={txns}/>;
+      case 'disputes': return <AdminDisputesPage user={user} disputes={disputes} setDisputes={setDisputes} addAudit={addAudit} toast={toast}/>;
+      case 'users-roles': return <AdminUsersPage user={user} users={users} setUsers={setUsers} addAudit={addAudit} toast={toast}/>;
+      case 'policy-config': return <AdminPolicyPage user={user} policies={policies} setPolicies={setPolicies} addAudit={addAudit} toast={toast}/>;
+      case 'audit-trail': return <AdminAuditPage auditLog={auditLog}/>;
+      default: return <AdminOverviewPage txns={txns} liveEvents={liveEvents} addAudit={addAudit}/>;
     }
   };
 
   var studentPage=()=>{
     switch(page){
-      case 'my-wallet': return <MyWalletPage user={user} users={users} setUsers={setUsers} txns={txns} toast={toast}/>;
-      case 'my-fees': return <MyFeesPage user={user} users={users} setUsers={setUsers} fees={fees} setFees={setFees} addTxn={addTxn} addAudit={addAudit} toast={toast}/>;
-      case 'events-tickets': return <EventsTicketsPage user={user} users={users} setUsers={setUsers} events={events} setEvents={setEvents} nfts={nfts} setNfts={setNfts} addTxn={addTxn} addAudit={addAudit} toast={toast}/>;
-      case 'p2p-transfer': return <P2PTransferPage user={user} users={users} setUsers={setUsers} addTxn={addTxn} addAudit={addAudit} policies={policies} toast={toast}/>;
-      case 'my-profile': return <MyProfilePage user={user} users={users} txns={txns} fees={fees} nfts={nfts}/>;
-      default: return <MyWalletPage user={user} users={users} setUsers={setUsers} txns={txns} toast={toast}/>;
+      case 'my-wallet': return <StudentWalletPage user={user} users={users} setUsers={setUsers} txns={txns} toast={toast} block={block}/>;
+      case 'my-fees': return <StudentFeesPage user={user} users={users} setUsers={setUsers} fees={fees} setFees={setFees} addTxn={addTxn} addAudit={addAudit} toast={toast} block={block}/>;
+      case 'events-tickets': return <StudentEventsPage user={user} users={users} setUsers={setUsers} events={events} setEvents={setEvents} nfts={nfts} setNfts={setNfts} addTxn={addTxn} addAudit={addAudit} toast={toast} block={block}/>;
+      case 'p2p-transfer': return <StudentP2PPage user={user} users={users} setUsers={setUsers} txns={txns} toast={toast} block={block} policies={policies}/>;
+      case 'my-profile': return <StudentProfilePage user={user} users={users} txns={txns} fees={fees} nfts={nfts}/>;
+      default: return <StudentWalletPage user={user} users={users} setUsers={setUsers} txns={txns} toast={toast} block={block}/>;
     }
   };
 
@@ -167,9 +171,9 @@ var App=()=>{
     <div style={{position:'fixed',inset:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
       <TopBar user={user} page={page} block={block} onLogout={logout} notifs={disputes.filter(d=>d.status==='Open').length}/>
       <div style={{display:'flex',flex:1,overflow:'hidden'}}>
-        <Sidebar role={user.role} page={page} setPage={setPage} disputes={disputes} fees={fees} collapsed={collapsed} setCollapsed={setCollapsed}/>
+        <Sidebar role={user.role} users={users} page={page} setPage={setPage} disputes={disputes} fees={fees} collapsed={collapsed} setCollapsed={setCollapsed}/>
         <div className="flex-1 scroll" style={{background:'#0a0a0f'}}>
-          {user.role==='admin'?adminPage():studentPage()}
+          {String(user.role || '').toLowerCase().includes('admin')?adminPage():studentPage()}
         </div>
       </div>
       <Toast toasts={toasts}/>

@@ -11,6 +11,7 @@
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" crossorigin="anonymous"></script>
 <script>tailwind.config={theme:{extend:{fontFamily:{sans:['DM Sans','sans-serif'],mono:['JetBrains Mono','monospace']}}}}</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -53,11 +54,11 @@ input:checked+.toggle-sl:before{transform:translateX(20px)}
 </head>
 <body>
 <div id="root"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" type="application/javascript"></script>
 <script type="text/babel" src="api.js" data-presets="react"></script>
 <script type="text/babel" src="data.js" data-presets="react"></script>
 <script type="text/babel" src="utils.js" data-presets="react"></script>
 <script type="text/babel" src="login.js" data-presets="react"></script>
+<script type="text/babel" src="layout.js" data-presets="react"></script>
 <script type="text/babel" src="admin-pages.js" data-presets="react"></script>
 <script type="text/babel" src="student-pages.js" data-presets="react"></script>
 <script type="text/babel" src="app.js" data-presets="react"></script>

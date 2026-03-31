@@ -32,6 +32,28 @@ var Modal=({open,onClose,title,children,wide})=>{
     </div>
   );};
 
+// Robust ID Comparison (handles MongoDB _id strings vs numeric IDs)
+var isMatch=(a,b)=>{
+  if(!a||!b)return false;
+  var v1=String(a._id||a.id||a);
+  var v2=String(b._id||b.id||b);
+  return v1===v2;
+};
+
+// Check if a user user object matches the session user
+var isSelf=(u,me)=>isMatch(u,me)||u.email===me.email;
+
+var fmtINR=v=>'₹'+Number(v||0).toLocaleString('en-IN');
+var fmtNow=()=>new Date().toLocaleString();
+var genHash=()=>'0x'+Array.from({length:64},()=>'0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
+var nextId=arr=>arr.length?Math.max(...arr.map(x=>Number(x.id||0)))+1:1;
+var rnd=arr=>arr[Math.floor(Math.random()*arr.length)];
+
+var daysUntil=d=>{
+  var diff=new Date(d)-new Date();
+  return Math.ceil(diff/(1000*60*60*24));
+};
+
 var Sparkline=({data,color})=>{
   var h=40,w=100,min=Math.min(...data),max=Math.max(...data),r=max-min||1;
   var pts=data.map((v,i)=>`${(i/(data.length-1))*w},${h-((v-min)/r)*h}`).join(' ');

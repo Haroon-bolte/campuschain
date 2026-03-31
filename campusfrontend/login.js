@@ -96,7 +96,7 @@ var LoginScreen=({onLogin})=>{
     </div>
   );};
 
-var Sidebar=({role,page,setPage,disputes,fees,collapsed,setCollapsed})=>{
+var Sidebar=({role,page,setPage,disputes,fees,collapsed,setCollapsed,users})=>{
   var openD=disputes.filter(d=>d.status==='Open').length;
   var aR=[
     {id:'overview',icon:'📊',label:'Overview'},
@@ -115,7 +115,11 @@ var Sidebar=({role,page,setPage,disputes,fees,collapsed,setCollapsed})=>{
     {id:'p2p-transfer',icon:'↔️',label:'P2P Transfer'},
     {id:'my-profile',icon:'👤',label:'My Profile'},
   ];
-  var routes=role==='admin'?aR:sR;
+  // Extremely robust check
+  const roleStr = String(role || '').trim().toLowerCase();
+  const isActuallyAdmin = roleStr.includes('admin');
+  var routes=isActuallyAdmin?aR:sR;
+
   return(
     <div className="flex flex-col shrink-0 transition-all duration-300" style={{width:collapsed?60:220,background:'linear-gradient(180deg,#0f0f1a,#0a0a14)',borderRight:'1px solid rgba(255,255,255,.08)',height:'100vh'}}>
       <div className="flex items-center gap-3 px-4" style={{height:60,borderBottom:'1px solid rgba(255,255,255,.08)'}}>
@@ -156,7 +160,7 @@ var TopBar=({user,page,block,onLogout,notifs})=>{
         <span className="text-gray-600 mx-1">›</span>
         <span className="text-gray-200 font-medium">{L[page]||page}</span>
       </div>
-      {user.role==='admin'&&(
+      {String(user.role || '').toLowerCase().includes('admin')&&(
         <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs" style={{background:'rgba(124,58,237,.1)',border:'1px solid rgba(124,58,237,.2)'}}>
           <span className="w-2 h-2 bg-green-400 rounded-full shrink-0" style={{boxShadow:'0 0 6px #4ade80'}}/>
           <span className="font-mono text-gray-300">Block #{block.toLocaleString()}</span>
@@ -172,7 +176,7 @@ var TopBar=({user,page,block,onLogout,notifs})=>{
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{background:'linear-gradient(135deg,#7c3aed,#2563eb)'}}>{user.name[0]}</div>
           <div>
             <div className="text-sm font-medium text-white leading-tight">{user.name}</div>
-            <Badge type={user.role==='admin'?'Admin':'Student'} text={user.role==='admin'?'Admin':'Student'}/>
+            <Badge type={String(user.role || '').toLowerCase().includes('admin')?'Admin':'Student'} text={String(user.role || '').toLowerCase().includes('admin')?'Admin':'Student'}/>
           </div>
         </div>
         <button onClick={onLogout} className="btn-s px-3 py-1.5 rounded-lg text-xs text-gray-400">Logout</button>

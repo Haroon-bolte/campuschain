@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const feeSchema = new mongoose.Schema({
-  sid: { type: Number, required: true },
+  sid: { type: mongoose.Schema.Types.Mixed, required: true },
   sname: { type: String, required: true },
   cat: { type: String, required: true },
   amount: { type: Number, required: true },

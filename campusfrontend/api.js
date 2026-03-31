@@ -2,10 +2,6 @@
 // Handles both Backend (REST) and Blockchain (Ethers.js) communication
 
 const BASE_URL = "http://localhost:5000/api";
-const NETWORK_CONFIG = {
-  "network": "localhost",
-  "chainId": 31337
-};
 
 // Contract ABIs
 const ABIS = {
@@ -33,11 +29,8 @@ const API = {
   // Initialize and load contract addresses
   init: async () => {
     if (!CONTRACT_CONFIG) {
-        console.log("💿 CampusAPI: Fetching contracts.json...");
         const res = await fetch('contracts.json');
-        if (!res.ok) throw new Error("Could not load contracts.json");
         const data = await res.json();
-        console.log("✅ CampusAPI: Config loaded", data.contracts);
         CONTRACT_CONFIG = data;
         window.CONTRACTS = data.contracts; 
     }
@@ -126,33 +119,43 @@ const API = {
 
   // --- Web3 Helpers ---
   getProvider: () => {
-    if (typeof window.ethereum !== 'undefined') {
-      return new ethers.providers.Web3Provider(window.ethereum);
+    if (typeof window.ethereum !== 'undefined' && window.ethers) {
+      return new window.ethers.providers.Web3Provider(window.ethereum);
     }
     return null;
   },
 
   connectWallet: async () => {
     if (typeof window.ethereum === 'undefined') {
-      throw new Error("MetaMask is not installed");
+      throw new Error("MetaMask is not installed. Please install MetaMask to use blockchain features.");
+    }
+    if (!window.ethers) {
+      throw new Error("Ethers library not loaded. Please refresh the page.");
     }
     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
     return accounts[0];
   },
 
-  getContract: (name, signer) => {
+  // Returns a signer (connected wallet) - use this for transactions
+  getSigner: () => {
+    if (!window.ethereum) throw new Error("MetaMask is not installed");
+    if (!window.ethers) throw new Error("Ethers library not loaded. Please refresh.");
+    const provider = new window.ethers.providers.Web3Provider(window.ethereum);
+    return provider.getSigner();
+  },
+
+  getContract: (name, signerOrProvider) => {
     if (!CONTRACT_CONFIG) throw new Error("API not initialized. Call API.init() first.");
     const address = CONTRACT_CONFIG.contracts[name];
     const abi = ABIS[name];
     if (!address) throw new Error(`Contract ${name} not found`);
-    return new ethers.Contract(address, abi, signer);
+    if (!window.ethers) throw new Error("Ethers library not loaded");
+    return new window.ethers.Contract(address, abi, signerOrProvider);
   },
 
   getBlockNumber: async () => {
     const provider = API.getProvider();
     if (!provider) return 0;
-    const network = await provider.getNetwork();
-    console.log(`🌐 Connected to Network: ${network.name} (Chain ID: ${network.chainId})`);
     return provider.getBlockNumber();
   }
 };

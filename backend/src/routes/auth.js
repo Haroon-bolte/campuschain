@@ -25,13 +25,11 @@ router.post("/register", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user with a mock wallet for the demo
-    const mockWallet = `0x${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`.toLowerCase();
-    
-    user = await User.create({ name, email, password: hashedPassword, role, walletAddress: mockWallet });
+    // Create user with default balance
+    user = await User.create({ name, email, password: hashedPassword, role, balance: 5000 });
 
     const token = signToken(user._id);
-    res.status(201).json({ success: true, token, user: { id: user._id, name, email, role, walletAddress: mockWallet } });
+    res.status(201).json({ success: true, token, user: { id: user._id, name, email, role, balance: user.balance } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -49,7 +47,7 @@ router.post("/login", async (req, res) => {
     if (!isMatch) return res.status(401).json({ success: false, message: "Invalid credentials" });
 
     const token = signToken(user._id);
-    res.json({ success: true, token, user: { id: user._id, name: user.name, email, role: user.role, walletAddress: user.walletAddress } });
+    res.json({ success: true, token, user: { id: user._id, name: user.name, email, role: user.role, balance: user.balance || 0 } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -104,7 +102,7 @@ router.post("/metamask", async (req, res) => {
     await user.save();
 
     const token = signToken(user._id);
-    res.json({ success: true, token, user: { id: user._id, name: user.name, walletAddress: wallet, role: user.role } });
+    res.json({ success: true, token, user: { id: user._id, name: user.name, wallet, role: user.role } });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

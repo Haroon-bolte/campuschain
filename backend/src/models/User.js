@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   dept: String,
   rollNo: String,
   semester: Number,
+  balance: { type: Number, default: 0 },
   otp: String,
   otpExpires: Date,
   nonce: { type: String, default: () => Math.floor(Math.random() * 1000000).toString() },

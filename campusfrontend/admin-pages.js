@@ -1,4 +1,4 @@
-var OverviewPage=({txns,liveEvents,addAudit})=>{
+var AdminOverviewPage=({txns,liveEvents,addAudit})=>{
   var [tab,setTab]=useState('Volume');
   var chartData={Volume:useMemo(()=>Array.from({length:30},()=>Math.floor(Math.random()*80000+20000)),[]),Tokens:useMemo(()=>Array.from({length:30},()=>Math.floor(Math.random()*5000+1000)),[]),Contracts:useMemo(()=>Array.from({length:30},()=>Math.floor(Math.random()*50+5)),[])};
   var colors={Volume:'#7c3aed',Tokens:'#0d9488',Contracts:'#e11d48'};
@@ -60,18 +60,18 @@ var OverviewPage=({txns,liveEvents,addAudit})=>{
     </div>
   );};
 
-var FeePortalPage=({fees,setFees,users,addAudit,addTxn,toast})=>{
+var AdminFeePortalPage=({user,fees,setFees,users,addAudit,addTxn,toast})=>{
+  var pending=fees.filter(f=>f.status==='Pending');
+  var confirmed=fees.filter(f=>f.status==='Confirmed');
   var [tab,setTab]=useState('Pending');
   var [modal,setModal]=useState(null);
   var [reminderText,setReminderText]=useState('');
-  var pending=fees.filter(f=>f.status==='Pending');
-  var confirmed=fees.filter(f=>f.status==='Confirmed');
-  var markPaid = async f => {
+  var confirmFee=async f=>{
     try {
-      const res = await CampusAPI.updateFee(f.id, { status: 'Confirmed', paidAt: new Date().toISOString() });
+      const res = await CampusAPI.updateFee(f._id||f.id, { status: 'Confirmed', paidAt: new Date().toISOString() });
       if (res.error) throw new Error(res.error);
       
-      setFees(prev => prev.map(x => x.id === f.id ? { ...x, status: 'Confirmed', paidAt: fmtNow() } : x));
+      setFees(prev => prev.map(x => isMatch(x, f) ? { ...x, status: 'Confirmed', paidAt: fmtNow() } : x));
       addAudit('FEE_CONFIRMED', user.name, `Marked ${f.sname} ${f.cat} fee as paid`);
       addTxn({ type: 'FEE_PAYMENT', sname: f.sname, amount: f.amount, service: f.cat, status: 'CONFIRMED' });
       toast('success', 'Fee Confirmed', `${f.sname} — ${f.cat} marked as paid`);
@@ -106,7 +106,7 @@ var FeePortalPage=({fees,setFees,users,addAudit,addTxn,toast})=>{
               <div className="text-xl font-bold font-mono text-white">{fmtINR(f.amount)}</div>
               {f.status==='Pending'&&(
                 <div className="flex gap-2">
-                  <BtnP onClick={()=>markPaid(f)} cls="flex-1 text-center">✅ Mark as Paid</BtnP>
+                  <BtnP onClick={()=>confirmFee(f)} cls="flex-1 text-center">✅ Mark as Paid</BtnP>
                   <BtnS onClick={()=>sendReminder(f)} cls="flex-1 text-center">📨 AI Reminder</BtnS>
                 </div>
               )}
@@ -122,7 +122,7 @@ var FeePortalPage=({fees,setFees,users,addAudit,addTxn,toast})=>{
     </div>
   );};
 
-var EventTicketsPage=({events,setEvents,users,nfts,setNfts,addAudit,addTxn,toast})=>{
+var AdminEventsPage=({user,events,setEvents,users,nfts,setNfts,addAudit,addTxn,toast})=>{
   var [modal,setModal]=useState(null);
   var [curEvent,setCurEvent]=useState(null);
   var [form,setForm]=useState({name:'',date:'',venue:'',price:'',cap:''});
@@ -147,20 +147,20 @@ var EventTicketsPage=({events,setEvents,users,nfts,setNfts,addAudit,addTxn,toast
       toast('error', 'Creation Failed', err.message);
     }
   };
-  var deleteEvent=e=>{if(!window.confirm(`Delete "${e.name}"?`))return;setEvents(prev=>prev.filter(x=>x.id!==e.id));addAudit('EVENT_DELETED','Dr. Meera Joshi',`Deleted event: ${e.name}`);toast('info','Event Deleted',e.name);};
+  var deleteEvent=e=>{if(!window.confirm(`Delete "${e.name}"?`))return;setEvents(prev=>prev.filter(x=>!isMatch(x,e)));addAudit('EVENT_DELETED','Dr. Meera Joshi',`Deleted event: ${e.name}`);toast('info','Event Deleted',e.name);};
   var mintNFT=()=>{
     var ev=events.find(e=>e.id===curEvent);
     var st=students.find(s=>s.id===Number(mintForm.sid));
     if(!ev||!st||!mintForm.seat)return;
     var token='TKT-'+genHash().substr(2,6);
     setNfts(prev=>[...prev,{id:'NFT-'+nextId(nfts).toString().padStart(3,'0'),sid:st.id,sname:st.name,eid:ev.id,ename:ev.name,seat:mintForm.seat,ts:fmtNow(),token}]);
-    setEvents(prev=>prev.map(e=>e.id===curEvent?{...e,sold:e.sold+1}:e));
+    setEvents(prev=>prev.map(e=>isMatch(e,ev)?{...e,sold:e.sold+1}:e));
     addAudit('NFT_MINTED','Dr. Meera Joshi',`Minted NFT for ${st.name} — ${ev.name} seat ${mintForm.seat}`);
     addTxn({type:'TOKEN_MINT',sname:st.name,amount:ev.price,service:'Event Ticket',status:'CONFIRMED'});
     toast('success','NFT Minted!',`Token: ${token}`);
     setMintForm({sid:'',seat:''});setModal(null);
   };
-  var burnTicket=n=>{setNfts(prev=>prev.filter(x=>x.id!==n.id));addAudit('NFT_BURNED','Dr. Meera Joshi',`Burned ticket ${n.token}`);toast('info','Ticket Burned',n.token);};
+  var burnTicket=n=>{setNfts(prev=>prev.filter(x=>!isMatch(x,n)));addAudit('NFT_BURNED','Dr. Meera Joshi',`Burned ticket ${n.token}`);toast('info','Ticket Burned',n.token);};
   return(
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -208,7 +208,7 @@ var EventTicketsPage=({events,setEvents,users,nfts,setNfts,addAudit,addTxn,toast
     </div>
   );};
 
-var UsersRolesPage=({users,setUsers,addAudit,toast})=>{
+var AdminUsersPage=({user,users,setUsers,addAudit,toast})=>{
   var [modal,setModal]=useState(null);
   var [editUser,setEditUser]=useState(null);
   var [form,setForm]=useState({name:'',email:'',role:'Student',balance:''});
@@ -217,13 +217,13 @@ var UsersRolesPage=({users,setUsers,addAudit,toast})=>{
   var openEdit=u=>{setEditUser(u);setForm({name:u.name,email:u.email,role:u.role,balance:String(u.balance)});setModal('form');};
   var save=()=>{
     if(!form.name||!form.email)return;
-    if(editUser){setUsers(prev=>prev.map(u=>u.id===editUser.id?{...u,...form,balance:Number(form.balance)}:u));addAudit('USER_UPDATED','Dr. Meera Joshi',`Updated user: ${form.name}`);toast('success','User Updated',form.name);}
+    if(editUser){setUsers(prev=>prev.map(u=>isMatch(u,editUser)?{...u,...form,balance:Number(form.balance)}:u));addAudit('USER_UPDATED','Dr. Meera Joshi',`Updated user: ${form.name}`);toast('success','User Updated',form.name);}
     else{var nu={id:nextId(users),name:form.name,email:form.email,role:form.role,balance:Number(form.balance)||0,status:'Active',wallet:'0x'+genFullHash().substr(2,40),dept:'General'};setUsers(prev=>[...prev,nu]);addAudit('USER_CREATED','Dr. Meera Joshi',`Created user: ${form.name}`);toast('success','User Created',form.name);}
     setModal(null);
   };
   var toggleSuspend=u=>{
     var ns=u.status==='Active'?'Suspended':'Active';
-    setUsers(prev=>prev.map(x=>x.id===u.id?{...x,status:ns}:x));
+    setUsers(prev=>prev.map(x=>isMatch(x,u)?{...x,status:ns}:x));
     addAudit(ns==='Suspended'?'USER_SUSPENDED':'USER_REACTIVATED','Dr. Meera Joshi',`${ns} user: ${u.name}`);
     toast(ns==='Suspended'?'warning':'success',`User ${ns}`,u.name);
   };
@@ -272,16 +272,16 @@ var UsersRolesPage=({users,setUsers,addAudit,toast})=>{
     </div>
   );};
 
-var PolicyConfigPage=({policies,setPolicies,addAudit,toast})=>{
+var AdminPolicyPage=({user,policies,setPolicies,addAudit,toast})=>{
   var [vals,setVals]=useState(()=>Object.fromEntries(policies.map(p=>[p.id,p.val])));
   var toggle=p=>{
-    setPolicies(prev=>prev.map(x=>x.id===p.id?{...x,enabled:!x.enabled}:x));
+    setPolicies(prev=>prev.map(x=>isMatch(x,p)?{...x,enabled:!x.enabled}:x));
     addAudit('POLICY_UPDATE','Dr. Meera Joshi',`${p.enabled?'Disabled':'Enabled'} policy: ${p.name}`);
     toast('info','Policy Updated',`${p.name} ${p.enabled?'disabled':'enabled'}`);
   };
   var update=p=>{
     var nv=Number(vals[p.id]);
-    setPolicies(prev=>prev.map(x=>x.id===p.id?{...x,val:nv}:x));
+    setPolicies(prev=>prev.map(x=>isMatch(x,p)?{...x,val:nv}:x));
     addAudit('POLICY_UPDATE','Dr. Meera Joshi',`Updated ${p.name} to ${nv} ${p.unit}`);
     toast('success','Contract Updated',`${p.name} → ${nv} ${p.unit} (on-chain)`);
   };
@@ -309,7 +309,7 @@ var PolicyConfigPage=({policies,setPolicies,addAudit,toast})=>{
     </div>
   );};
 
-var AuditTrailPage=({auditLog})=>{
+var AdminAuditPage=({auditLog})=>{
   var [filter,setFilter]=useState('All');
   var types=['All','FEE_CONFIRMED','POLICY_UPDATE','USER_SUSPENDED','USER_CREATED','NFT_MINTED','SMART_CTR','DISPUTE_RESOLVED'];
   var filtered=filter==='All'?auditLog:auditLog.filter(a=>a.action===filter);
@@ -346,7 +346,7 @@ var AuditTrailPage=({auditLog})=>{
     </div>
   );};
 
-var DisputesPage=({disputes,setDisputes,addAudit,toast})=>{
+var AdminDisputesPage=({user,disputes,setDisputes,addAudit,toast})=>{
   var [tab,setTab]=useState('Open');
   var open=disputes.filter(d=>d.status==='Open');
   var resolved=disputes.filter(d=>d.status==='Resolved');
@@ -380,7 +380,7 @@ var DisputesPage=({disputes,setDisputes,addAudit,toast})=>{
     </div>
   );};
 
-var P2PAdminPage=({txns})=>{
+var AdminP2PPage=({txns})=>{
   var p2p=txns.filter(t=>t.type==='P2P_XFER');
   return(
     <div className="p-6">
